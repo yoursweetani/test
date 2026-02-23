@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeReport — School Incident Reporting</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #eef3f8; --bg2: #e4ecf5; --surface: #f7fafd; --surface2: #dde8f3;
+    --border: #c5d8ec; --accent: #4a7fb5; --accent-dark: #2f5d8a;
+    --text: #1e2d3d; --text-muted: #5a7a96; --text-soft: #8aabca;
+    --danger: #b83232; --shadow: 0 2px 16px rgba(74,127,181,0.10);
+    --shadow-lg: 0 8px 40px rgba(74,127,181,0.14);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:0; }
+
+  nav { position:sticky; top:0; z-index:100; background:rgba(238,243,248,0.88); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:60px; }
+  .nav-brand { font-family:'Instrument Serif',serif; font-size:1.25rem; color:var(--accent-dark); letter-spacing:-0.01em; display:flex; align-items:center; gap:0.5rem; }
+  .nav-brand .dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:pulse 2.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.3);opacity:0.6;} }
+  .nav-tabs { display:flex; gap:0.25rem; margin-left:auto; }
+  .nav-tab { padding:0.4rem 1rem; border-radius:8px; border:none; background:transparent; color:var(--text-muted); font-family:'DM Sans',sans-serif; font-size:0.875rem; font-weight:500; cursor:pointer; transition:all 0.2s; }
+  .nav-tab:hover { background:var(--surface2); color:var(--text); }
+  .nav-tab.active { background:var(--accent); color:#fff; }
+  .nav-tab.admin-tab { color:var(--text-soft); font-size:0.78rem; letter-spacing:0.05em; }
+  .nav-tab.admin-tab:hover { color:var(--text-muted); }
+
+  section { display:none; position:relative; z-index:1; }
+  section.active { display:block; }
+  .container { max-width:700px; margin:0 auto; padding:3rem 1.5rem; }
+
+  .page-header { margin-bottom:2rem; }
+  .page-header h1 { font-family:'Instrument Serif',serif; font-size:2.2rem; font-weight:400; line-height:1.15; color:var(--text); margin-bottom:0.5rem; }
+  .page-header h1 em { color:var(--accent); font-style:italic; }
+  .page-header p { color:var(--text-muted); font-size:0.9rem; line-height:1.6; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:2rem; box-shadow:var(--shadow); margin-bottom:1.25rem; }
+
+  /* Privacy */
+  .privacy-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); margin-bottom:1.25rem; overflow:hidden; }
+  .privacy-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; cursor:pointer; user-select:none; transition:background 0.2s; gap:1rem; }
+  .privacy-header:hover { background:var(--bg2); }
+  .privacy-header-left { display:flex; align-items:center; gap:0.75rem; }
+  .privacy-icon { width:34px; height:34px; background:rgba(74,127,181,0.12); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+  .privacy-title { font-size:0.9rem; font-weight:600; color:var(--text); }
+  .privacy-subtitle { font-size:0.78rem; color:var(--text-muted); margin-top:0.1rem; }
+  .privacy-chevron { color:var(--text-soft); font-size:0.85rem; transition:transform 0.25s; flex-shrink:0; }
+  .privacy-card.open .privacy-chevron { transform:rotate(180deg); }
+  .privacy-body { display:none; padding:0 1.5rem 1.5rem; border-top:1px solid var(--border); }
+  .privacy-card.open .privacy-body { display:block; }
+  .privacy-section { padding:1rem 0; border-bottom:1px solid var(--surface2); }
+  .privacy-section:last-child { border-bottom:none; padding-bottom:0; }
+  .ps-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent); margin-bottom:0.4rem; }
+  .ps-content { font-size:0.875rem; color:var(--text-muted); line-height:1.65; }
+  .ps-content strong { color:var(--text); font-weight:500; }
+
+  /* Warning */
+  .warning-card { background:#fff8f8; border:1.5px solid #f0c0c0; border-radius:16px; padding:1.25rem 1.5rem; margin-bottom:1.25rem; display:flex; gap:1rem; align-items:flex-start; }
+  .warning-icon { font-size:1.4rem; flex-shrink:0; margin-top:0.05rem; }
+  .wc-title { font-size:0.875rem; font-weight:700; color:var(--danger); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.04em; }
+  .wc-text { font-size:0.84rem; color:#7a3a3a; line-height:1.6; }
+
+  .anon-badge { display:flex; align-items:center; gap:0.6rem; background:rgba(74,127,181,0.08); border:1px solid rgba(74,127,181,0.2); border-radius:10px; padding:0.65rem 1rem; margin-bottom:1.5rem; font-size:0.84rem; color:var(--accent-dark); }
+
+  /* Form */
+  .form-group { margin-bottom:1.4rem; }
+  label { display:block; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:0.45rem; }
+  input[type=text], input[type=password], select, textarea { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:0.7rem 1rem; font-family:'DM Sans',sans-serif; font-size:0.9rem; color:var(--text); outline:none; transition:border-color 0.2s, box-shadow 0.2s; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,127,181,0.12); }
+  select { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235a7a96' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 0.75rem center; background-color:var(--bg); padding-right:2.5rem; cursor:pointer; }
+  textarea { resize:vertical; min-height:120px; line-height:1.6; }
+
+  /* File upload */
+  .file-drop { border:2px dashed var(--border); border-radius:10px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.2s; background:var(--bg); position:relative; }
+  .file-drop:hover, .file-drop.dragover { border-color:var(--accent); background:rgba(74,127,181,0.05); }
+  .file-drop input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .file-drop .icon { font-size:2rem; margin-bottom:0.4rem; }
+  .file-drop p { font-size:0.85rem; color:var(--text-muted); }
+  .file-drop strong { color:var(--accent); }
+
+  #file-previews { margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.6rem; }
+  .preview-item { position:relative; }
+  .preview-item img { width:90px; height:90px; object-fit:cover; border-radius:8px; border:1.5px solid var(--border); display:block; cursor:pointer; }
+  .preview-item .remove-btn { position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:#fff; border:none; cursor:pointer; font-size:0.7rem; display:flex; align-items:center; justify-content:center; }
+
+  .consent-row { display:flex; align-items:flex-start; gap:0.75rem; padding:1rem; background:#fffbf0; border:1px solid #e8d58a; border-radius:10px; margin-bottom:1.25rem; cursor:pointer; }
+  .consent-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); margin-top:0.15rem; cursor:pointer; flex-shrink:0; }
+  .consent-text { font-size:0.82rem; color:#6b5a10; line-height:1.55; }
+
+  .btn-primary { width:100%; padding:0.85rem; background:var(--accent); color:#fff; border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:0.95rem; font-weight:600; cursor:pointer; transition:background 0.2s, transform 0.1s; display:flex; align-items:center; justify-content:center; gap:0.5rem; }
+  .btn-primary:hover:not(:disabled) { background:var(--accent-dark); }
+  .btn-primary:active:not(:disabled) { transform:scale(0.99); }
+  .btn-primary:disabled { background:var(--text-soft); cursor:not-allowed; opacity:0.7; }
+  .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+
+  .report-id-box { background:var(--bg2); border:1px dashed var(--accent); border-radius:10px; padding:1rem 1.25rem; margin-top:1rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .rib-label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+  .rib-id { font-size:1.1rem; font-weight:600; color:var(--accent-dark); letter-spacing:0.05em; }
+  .copy-btn { background:var(--accent); color:#fff; border:none; border-radius:7px; padding:0.35rem 0.75rem; font-size:0.78rem; font-family:'DM Sans',sans-serif; cursor:pointer; transition:background 0.2s; }
+  .copy-btn:hover { background:var(--accent-dark); }
+
+  /* Status page */
+  .search-row { display:flex; gap:0.5rem; }
+  .search-row input { flex:1; }
+  .btn-secondary { padding:0.7rem 1.2rem; background:var(--accent); color:#fff; border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:0.875rem; font-weight:600; cursor:pointer; transition:background 0.2s; white-space:nowrap; }
+  .btn-secondary:hover { background:var(--accent-dark); }
+
+  .report-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.25rem 1.5rem; box-shadow:var(--shadow); animation:fadeUp 0.3s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+  .report-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:1rem; }
+  .rc-id { font-size:0.75rem; color:var(--text-soft); font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .rc-type { font-size:1rem; font-weight:600; color:var(--text); margin-top:0.15rem; }
+  .status-badge { padding:0.3rem 0.75rem; border-radius:20px; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; white-space:nowrap; flex-shrink:0; }
+  .status-pending { background:#fef3e2; color:#b96e0a; }
+  .status-reviewing { background:#dbeafe; color:#1d60b0; }
+  .status-resolved { background:#dcfce7; color:#166534; }
+  .status-dismissed { background:#f3f4f6; color:#6b7280; }
+  .report-card-body { font-size:0.875rem; color:var(--text-muted); line-height:1.6; }
+  .report-card-footer { display:flex; align-items:center; justify-content:space-between; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--surface2); font-size:0.78rem; color:var(--text-soft); flex-wrap:wrap; gap:0.5rem; }
+
+  .admin-note-bubble { margin-top:1rem; background:rgba(74,127,181,0.07); border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:0.85rem 1rem; font-size:0.85rem; color:var(--text-muted); line-height:1.55; }
+  .admin-note-bubble .anb-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); margin-bottom:0.3rem; }
+
+  .progress-steps { display:flex; align-items:center; margin:0.75rem 0; }
+  .step { display:flex; flex-direction:column; align-items:center; flex:1; position:relative; }
+  .step:not(:last-child)::after { content:''; position:absolute; top:12px; left:50%; right:-50%; height:2px; background:var(--border); z-index:0; }
+  .step.done:not(:last-child)::after { background:var(--accent); }
+  .step-dot { width:24px; height:24px; border-radius:50%; border:2px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:var(--text-soft); z-index:1; position:relative; }
+  .step.done .step-dot { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .step.current .step-dot { border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 3px rgba(74,127,181,0.15); }
+  .step-label { font-size:0.62rem; color:var(--text-soft); margin-top:0.3rem; text-align:center; }
+  .step.done .step-label, .step.current .step-label { color:var(--accent-dark); font-weight:500; }
+
+  .divider { height:1px; background:var(--border); margin:1.25rem 0; }
+  .info-note { background:rgba(74,127,181,0.07); border:1px solid rgba(74,127,181,0.2); border-radius:8px; padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-muted); line-height:1.5; }
+  .empty-state { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+  .empty-state .emo { font-size:2.5rem; margin-bottom:0.75rem; }
+  .empty-state p { font-size:0.9rem; }
+
+  .submitted-images { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem; }
+  .submitted-images img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1.5px solid var(--border); cursor:pointer; }
+
+  /* Admin */
+  .admin-login-wrap { max-width:380px; margin:6rem auto; padding:0 1.5rem; }
+  .admin-login-wrap h2 { font-family:'Instrument Serif',serif; font-size:1.7rem; font-weight:400; color:var(--text); margin-bottom:0.4rem; }
+  .admin-login-wrap p { font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem; }
+  .lock-icon { font-size:2rem; margin-bottom:0.75rem; }
+  #admin-error { font-size:0.82rem; color:var(--danger); margin-top:0.5rem; display:none; }
+
+  .admin-panel-wrap { max-width:760px; margin:0 auto; padding:2.5rem 1.5rem; }
+  .admin-panel-wrap h2 { font-family:'Instrument Serif',serif; font-size:1.8rem; font-weight:400; margin-bottom:0.3rem; }
+  .admin-panel-wrap > p { color:var(--text-muted); font-size:0.875rem; margin-bottom:2rem; }
+
+  .admin-report-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.5rem; box-shadow:var(--shadow); margin-bottom:1rem; animation:fadeUp 0.3s ease; }
+  .arc-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1rem; }
+  .arc-meta .arc-id { font-size:0.72rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--text-soft); }
+  .arc-meta .arc-type { font-size:1rem; font-weight:600; color:var(--text); margin-top:0.1rem; }
+  .arc-body { font-size:0.875rem; color:var(--text-muted); line-height:1.6; margin-bottom:1rem; }
+  .arc-body strong { color:var(--text); }
+
+  .arc-images { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; }
+  .arc-images img { width:100px; height:100px; object-fit:cover; border-radius:8px; border:1.5px solid var(--border); cursor:pointer; transition:transform 0.15s; }
+  .arc-images img:hover { transform:scale(1.04); }
+
+  .arc-controls { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; }
+  .arc-controls select { flex:1; min-width:150px; font-size:0.875rem; }
+  .arc-controls textarea { flex:2; min-width:200px; min-height:70px; font-size:0.85rem; }
+  .arc-save-btn { padding:0.65rem 1.25rem; background:var(--accent); color:#fff; border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:0.875rem; font-weight:600; cursor:pointer; transition:background 0.2s; white-space:nowrap; display:flex; align-items:center; gap:0.4rem; }
+  .arc-save-btn:hover { background:var(--accent-dark); }
+  .arc-saved { font-size:0.78rem; color:#3a9e6e; display:none; margin-top:0.3rem; }
+
+  .admin-topbar { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.25rem; }
+  .logout-btn { background:none; border:1px solid var(--border); color:var(--text-muted); border-radius:8px; padding:0.35rem 0.8rem; font-size:0.78rem; font-family:'DM Sans',sans-serif; cursor:pointer; transition:all 0.2s; }
+  .logout-btn:hover { background:var(--surface2); color:var(--text); }
+
+  .loading-reports { text-align:center; padding:2rem; color:var(--text-muted); font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:0.6rem; }
+  .loading-reports .spinner { border-color:rgba(74,127,181,0.3); border-top-color:var(--accent); }
+
+  /* Lightbox */
+  .lightbox { display:none; position:fixed; inset:0; background:rgba(10,20,35,0.88); z-index:999; align-items:center; justify-content:center; }
+  .lightbox.open { display:flex; }
+  .lightbox img { max-width:90vw; max-height:90vh; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+  .lightbox-close { position:absolute; top:1.5rem; right:1.5rem; background:rgba(255,255,255,0.15); border:none; color:#fff; font-size:1.4rem; width:40px; height:40px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+
+  .toast { position:fixed; bottom:2rem; right:2rem; background:var(--accent-dark); color:#fff; padding:0.85rem 1.25rem; border-radius:12px; font-size:0.875rem; display:flex; align-items:center; gap:0.6rem; box-shadow:var(--shadow-lg); transform:translateY(120%); opacity:0; transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1); z-index:200; }
+  .toast.show { transform:translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand"><div class="dot"></div>SafeReport</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('submit',this)">Submit Report</button>
+    <button class="nav-tab" onclick="showSection('status',this)">My Reports</button>
+    <button class="nav-tab admin-tab" onclick="showSection('admin-gate',this)">·</button>
+  </div>
+</nav>
+
+<!-- ════ SUBMIT ════ -->
+<section id="submit" class="active">
+  <div class="container">
+    <div class="page-header">
+      <h1>Report an <em>Incident</em></h1>
+      <p>Submit a confidential report about a prohibited act on school grounds. All reports are fully anonymous — no personal information about you is ever collected.</p>
+    </div>
+
+    <div class="privacy-card" id="privacyCard">
+      <div class="privacy-header" onclick="togglePrivacy()">
+        <div class="privacy-header-left">
+          <div class="privacy-icon">🔒</div>
+          <div>
+            <div class="privacy-title">Data Privacy &amp; Use Notice</div>
+            <div class="privacy-subtitle">Tap to read what is collected, who can see it, and how long it is kept</div>
+          </div>
+        </div>
+        <div class="privacy-chevron">▼</div>
+      </div>
+      <div class="privacy-body">
+        <div class="privacy-section">
+          <div class="ps-label">Why This Data is Collected</div>
+          <div class="ps-content">Reports and any submitted evidence are collected <strong>solely to support disciplinary action against prohibited acts on school grounds</strong> — including but not limited to tobacco and vaping use, substance use, bullying, vandalism, and other violations of school policy.</div>
+        </div>
+        <div class="privacy-section">
+          <div class="ps-label">What Data is Collected</div>
+          <div class="ps-content">A description of the incident, its location, the approximate date and time, and <strong>photo evidence of the student(s) being accused</strong>. No information about the reporter is ever collected — all submissions are entirely and permanently anonymous.</div>
+        </div>
+        <div class="privacy-section">
+          <div class="ps-label">Who Can Access This Data</div>
+          <div class="ps-content">Submitted reports and evidence are accessible <strong>only to school administrators and school-authorized student managers</strong> who have been officially designated to handle disciplinary matters.</div>
+        </div>
+        <div class="privacy-section">
+          <div class="ps-label">How Long Data is Kept</div>
+          <div class="ps-content">All submitted data is <strong>deleted immediately after the verification process is completed</strong>, regardless of whether the report is confirmed or dismissed.</div>
+        </div>
+        <div class="privacy-section">
+          <div class="ps-label">What Verification Involves</div>
+          <div class="ps-content">
+            <strong>① Incident Verification</strong> — Confirming whether the accused student did in fact commit a prohibited act.<br><br>
+            <strong>② Identity Matching</strong> — Verifying the student identified matches the individual in any submitted evidence.<br><br>
+            <strong>③ Evidence Integrity Check</strong> — Reviewing media for tampering: AI-generated images, digital manipulation (e.g. Photoshop), or content taken out of context.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warning-card">
+      <div class="warning-icon">⚠️</div>
+      <div class="warning-content">
+        <div class="wc-title">Warning: False Reporting is a Punishable Offense</div>
+        <div class="wc-text">Deliberately submitting a false report, fabricating or tampering with evidence, or reporting a student out of personal malice — even anonymously — is a serious violation of school policy. Students found responsible will face disciplinary consequences, <strong>including suspension</strong>.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="anon-badge"><span>🛡️</span><span>This report is <strong>fully anonymous</strong>. No information about you is collected, stored, or traceable.</span></div>
+      <form id="report-form">
+        <div class="form-group">
+          <label>Type of Incident</label>
+          <select id="incident-type" required>
+            <option value="">Select a category…</option>
+            <option>Tobacco / Vaping on School Grounds</option>
+            <option>Bullying / Harassment</option>
+            <option>Physical Altercation / Violence</option>
+            <option>Substance Use (Drugs / Alcohol)</option>
+            <option>Vandalism / Property Damage</option>
+            <option>Theft</option>
+            <option>Cyberbullying</option>
+            <option>Weapons Possession</option>
+            <option>Discrimination / Hate Speech</option>
+            <option>Other Prohibited Act</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Student Being Accused <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.78rem;">(name, section, or description)</span></label>
+          <input type="text" id="accused-name" placeholder="e.g. Juan dela Cruz, Grade 10-B — or 'tall student near gym with red bag'">
+        </div>
+        <div class="form-group">
+          <label>Location of Incident</label>
+          <input type="text" id="location" placeholder="e.g. Back of the canteen, Room 302, Boys' CR near gym…">
+        </div>
+        <div class="form-group">
+          <label>Date &amp; Time</label>
+          <input type="text" id="incident-date" placeholder="e.g. February 21, 2026 around 2:30 PM">
+        </div>
+        <div class="form-group">
+          <label>Describe What Happened</label>
+          <textarea id="description" placeholder="Describe the incident in as much detail as possible. What exactly did you see? Include any details that could help verify the report." required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Attach Evidence <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.78rem;">(photos — optional but encouraged)</span></label>
+          <div class="file-drop" id="drop-zone">
+            <input type="file" id="file-input" multiple accept="image/*" onchange="handleFiles(this.files)">
+            <div class="icon">📷</div>
+            <p><strong>Click to upload</strong> or drag &amp; drop</p>
+            <p>Images only. Do not submit edited or AI-generated images.</p>
+          </div>
+          <div id="file-previews"></div>
+        </div>
+        <div class="divider"></div>
+        <label class="consent-row" for="consent-check">
+          <input type="checkbox" id="consent-check" onchange="updateSubmitBtn()">
+          <div class="consent-text">I confirm that to the best of my knowledge, this report is <strong>truthful and submitted in good faith</strong>. I understand that submitting a false, fabricated, or malicious report is a punishable offense that may result in <strong>suspension or other disciplinary action</strong>.</div>
+        </label>
+        <button type="submit" class="btn-primary" id="submit-btn" disabled>
+          <span id="submit-label">Submit Anonymous Report →</span>
+        </button>
+      </form>
+
+      <div id="success-box" style="display:none; margin-top:1.5rem;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:2.5rem; margin-bottom:0.5rem;">✅</div>
+          <div style="font-weight:600; font-size:1.05rem;">Report submitted successfully!</div>
+          <div style="color:var(--text-muted); font-size:0.875rem; margin-top:0.25rem;">Your report has been sent to school administration for review.</div>
+        </div>
+        <div class="report-id-box">
+          <div><div class="rib-label">Your Report ID</div><div class="rib-id" id="display-id">—</div></div>
+          <button class="copy-btn" onclick="copyId()">Copy</button>
+        </div>
+        <div class="info-note" style="margin-top:1rem;">⚠️ This ID is the <strong>only way to track your report's status</strong>. Copy it now and keep it safe. Check status under <strong>"My Reports"</strong>.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ STATUS ════ -->
+<section id="status">
+  <div class="container">
+    <div class="page-header">
+      <h1>Track Your <em>Report</em></h1>
+      <p>Enter the Report ID you received after submitting. Status is updated by administration — your identity remains completely anonymous.</p>
+    </div>
+    <div class="card">
+      <label>Your Report ID</label>
+      <div class="search-row">
+        <input type="text" id="search-id" placeholder="e.g. RPT-4F2A9B" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn-secondary" onclick="lookupReport()">Look Up</button>
+      </div>
+    </div>
+    <div id="reports-output">
+      <div class="empty-state"><div class="emo">🔍</div><p>Enter your Report ID above to check on your submission.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ ADMIN GATE ════ -->
+<section id="admin-gate">
+  <div class="admin-login-wrap">
+    <div class="lock-icon">🔐</div>
+    <h2>Admin Access</h2>
+    <p>This area is restricted to authorized school personnel only.</p>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="admin-password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') tryLogin()">
+    </div>
+    <button class="btn-primary" onclick="tryLogin()">Log In</button>
+    <div id="admin-error">Incorrect password. Please try again.</div>
+  </div>
+</section>
+
+<!-- ════ ADMIN PANEL ════ -->
+<section id="admin-panel">
+  <div class="admin-panel-wrap">
+    <div class="admin-topbar">
+      <div>
+        <h2>Admin Dashboard</h2>
+        <p>Update report statuses and leave notes for reporters. Changes are live instantly.</p>
+      </div>
+      <button class="logout-btn" onclick="adminLogout()">Log out</button>
+    </div>
+    <div id="admin-reports-list">
+      <div class="loading-reports"><div class="spinner"></div> Loading reports…</div>
+    </div>
+  </div>
+</section>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Evidence">
+</div>
+
+<div class="toast" id="toast"><span>✔</span><span id="toast-msg">Done!</span></div>
+
+<script>
+  // ── Config ──
+  emailjs.init('CefZg9tJydyBa5f4P');
+  const SERVICE_ID  = 'service_bkdreports';
+  const TEMPLATE_ID = 'template_xbt3x3o';
+
+  const GL_TOKEN     = 'glpat-LSMyhRcQ-stLabNkI8ZW5G86MQp1Omtxanp5Cw.01.121o8fwzr';
+  const GL_PROJECT   = '79699857';
+  const GL_FILE      = 'reports.json';
+  const GL_BRANCH    = 'main';
+  const GL_API       = `https://gitlab.com/api/v4/projects/${GL_PROJECT}/repository/files/${encodeURIComponent(GL_FILE)}`;
+
+  const ADMIN_PASS   = 'SafeReport2026';
+
+  const CLOUDINARY_CLOUD  = 'dehysmigs';
+  const CLOUDINARY_PRESET = 'meowmeow';
+  const CLOUDINARY_URL    = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
+
+  let fileObjs = []; // { name, dataUrl, url (after upload) }
+
+  // ── GitLab helpers ──
+  async function glRead() {
+    const res = await fetch(`${GL_API}?ref=${GL_BRANCH}`, {
+      headers: { 'PRIVATE-TOKEN': GL_TOKEN }
+    });
+    if (!res.ok) throw new Error('Could not read reports from GitLab.');
+    const data = await res.json();
+    return JSON.parse(atob(data.content));
+  }
+
+  async function glWrite(reports, commitMsg) {
+    // Get current file sha (needed for updates)
+    const res = await fetch(`${GL_API}?ref=${GL_BRANCH}`, {
+      headers: { 'PRIVATE-TOKEN': GL_TOKEN }
+    });
+    const existing = await res.json();
+
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(reports, null, 2))));
+
+    const method = res.ok ? 'PUT' : 'POST';
+    const body = {
+      branch: GL_BRANCH,
+      content,
+      commit_message: commitMsg || 'Update reports',
+      encoding: 'base64',
+    };
+    if (res.ok) body.last_commit_id = existing.last_commit_id;
+
+    const writeRes = await fetch(GL_API, {
+      method,
+      headers: { 'PRIVATE-TOKEN': GL_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!writeRes.ok) {
+      const err = await writeRes.json();
+      throw new Error(err.message || 'Could not save to GitLab.');
+    }
+    return writeRes.json();
+  }
+
+  // ── Nav ──
+  function showSection(id, el) {
+    if (id === 'admin-gate' && sessionStorage.getItem('adminLoggedIn') === 'yes') {
+      id = 'admin-panel';
+      renderAdminPanel();
+    }
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    el.classList.add('active');
+  }
+
+  function togglePrivacy() { document.getElementById('privacyCard').classList.toggle('open'); }
+  function updateSubmitBtn() { document.getElementById('submit-btn').disabled = !document.getElementById('consent-check').checked; }
+
+  // ── File handling ──
+  function handleFiles(newFiles) {
+    for (const f of newFiles) {
+      if (!f.type.startsWith('image/')) { showToast(`"${f.name}" is not an image.`); continue; }
+      if (fileObjs.find(x => x.name === f.name)) continue;
+      const reader = new FileReader();
+      reader.onload = e => { fileObjs.push({ name: f.name, dataUrl: e.target.result }); renderPreviews(); };
+      reader.readAsDataURL(f);
+    }
+  }
+  function removeFile(name) { fileObjs = fileObjs.filter(f => f.name !== name); renderPreviews(); }
+  function renderPreviews() {
+    document.getElementById('file-previews').innerHTML = fileObjs.map(f => `
+      <div class="preview-item">
+        <img src="${f.dataUrl}" alt="${f.name}" onclick="openLightbox('${f.dataUrl}')">
+        <button class="remove-btn" onclick="removeFile('${f.name}')">✕</button>
+      </div>`).join('');
+  }
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+
+  // ── Lightbox ──
+  function openLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('open'); }
+  function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+  // ── Submit ──
+  document.getElementById('report-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const type = document.getElementById('incident-type').value;
+    const desc = document.getElementById('description').value.trim();
+    if (!type) { showToast('Please select an incident type.'); return; }
+    if (!desc) { showToast('Please describe the incident.'); return; }
+
+    const btn = document.getElementById('submit-btn');
+    const label = document.getElementById('submit-label');
+    btn.disabled = true;
+    label.innerHTML = '<div class="spinner"></div> Sending…';
+
+    const reportId    = 'RPT-' + Math.random().toString(36).substring(2,8).toUpperCase();
+    const submittedAt = new Date().toLocaleString('en-US', { dateStyle:'long', timeStyle:'short' });
+
+    const report = {
+      id: reportId, type,
+      accused:     document.getElementById('accused-name').value || 'Not specified',
+      description: desc,
+      location:    document.getElementById('location').value || 'Not specified',
+      date:        document.getElementById('incident-date').value || 'Not specified',
+      images:      [], // filled after Cloudinary upload
+      status:      'pending',
+      adminNote:   '',
+      submitted:   submittedAt,
+    };
+
+    try {
+      // 1. Upload images to Cloudinary to get real public URLs
+      label.innerHTML = '<div class="spinner"></div> Uploading images…';
+      const uploadedImages = [];
+      for (const f of fileObjs) {
+        const formData = new FormData();
+        // Convert dataUrl back to blob
+        const blob = await (await fetch(f.dataUrl)).blob();
+        formData.append('file', blob, f.name);
+        formData.append('upload_preset', CLOUDINARY_PRESET);
+        const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`Image upload failed for ${f.name}`);
+        const data = await res.json();
+        uploadedImages.push({ name: f.name, dataUrl: f.dataUrl, url: data.secure_url });
+      }
+
+      label.innerHTML = '<div class="spinner"></div> Saving report…';
+
+      // Update report with Cloudinary URLs
+      report.images = uploadedImages;
+
+      // 2. Read current reports from GitLab
+      let reports = {};
+      try { reports = await glRead(); } catch(_) { reports = {}; }
+
+      // 3. Add new report & write back to GitLab
+      reports[reportId] = report;
+      await glWrite(reports, `New report: ${reportId}`);
+
+      // 4. Send email with real Cloudinary image URLs
+      label.innerHTML = '<div class="spinner"></div> Sending email…';
+      const imagesHtml = uploadedImages.length
+        ? uploadedImages.map(f =>
+            `<div style="margin:8px 0;">
+               <img src="${f.url}" style="max-width:100%;max-height:400px;border-radius:8px;display:block;" alt="${f.name}">
+             </div>`
+          ).join('')
+        : '<p style="color:#888;">No images attached.</p>';
+
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, {
+        report_id: reportId, incident_type: type,
+        accused: report.accused, location: report.location,
+        incident_date: report.date, description: desc,
+        submitted_at: submittedAt, images_html: imagesHtml,
+      });
+
+      document.getElementById('display-id').textContent = reportId;
+      document.getElementById('report-form').style.display = 'none';
+      document.getElementById('success-box').style.display = 'block';
+      fileObjs = []; renderPreviews();
+
+    } catch (err) {
+      console.error(err);
+      label.innerHTML = 'Submit Anonymous Report →';
+      btn.disabled = false;
+      showToast('Submission failed: ' + (err.message || 'Check your connection.'));
+    }
+  });
+
+  function copyId() {
+    navigator.clipboard.writeText(document.getElementById('display-id').textContent)
+      .then(() => showToast('Report ID copied!'));
+  }
+
+  // ── Status lookup ──
+  async function lookupReport() {
+    const query = document.getElementById('search-id').value.trim().toUpperCase();
+    const out   = document.getElementById('reports-output');
+    if (!query) { out.innerHTML = '<div class="empty-state"><div class="emo">🔍</div><p>Enter a Report ID to look up your submission.</p></div>'; return; }
+
+    out.innerHTML = '<div class="loading-reports"><div class="spinner"></div> Looking up…</div>';
+
+    try {
+      const reports = await glRead();
+      const report  = reports[query];
+
+      if (!report) {
+        out.innerHTML = `<div class="empty-state"><div class="emo">❌</div><p>No report found for <strong>${query}</strong>.<br>Please check your Report ID and try again.</p></div>`;
+        return;
+      }
+
+      const steps = ['pending','reviewing','resolved'];
+      const stepLabels = ['Submitted','Under Review','Resolved'];
+      let cur = steps.indexOf(report.status === 'dismissed' ? 'resolved' : report.status);
+      if (cur < 0) cur = 0;
+
+      const stepsHTML = steps.map((s,i) => `
+        <div class="step ${i<cur?'done':i===cur?'current':''}">
+          <div class="step-dot">${i<cur?'✓':i+1}</div>
+          <div class="step-label">${stepLabels[i]}</div>
+        </div>`).join('');
+
+      const badgeClass = {pending:'status-pending',reviewing:'status-reviewing',resolved:'status-resolved',dismissed:'status-dismissed'}[report.status]||'status-pending';
+      const badgeLabel = {pending:'Pending',reviewing:'Under Review',resolved:'Resolved',dismissed:'Dismissed'}[report.status]||'Pending';
+
+      const statusNote = {
+        pending:   `<div class="info-note" style="margin-top:1rem;">⏳ Your report has been received and is awaiting review by school administration.</div>`,
+        reviewing: `<div class="info-note" style="margin-top:1rem;">🔎 Your report is currently being reviewed and verified by authorized personnel.</div>`,
+        resolved:  `<div class="info-note" style="margin-top:1rem; background:rgba(58,158,110,0.08); border-color:rgba(58,158,110,0.3); color:#2d6a50;">✅ This report has been resolved. All submitted data will be permanently deleted per our data policy.</div>`,
+        dismissed: `<div class="info-note" style="margin-top:1rem; background:#f3f4f6; border-color:#d1d5db; color:#6b7280;">🚫 This report was reviewed and dismissed after verification.</div>`
+      }[report.status]||'';
+
+      const noteHtml = report.adminNote
+        ? `<div class="admin-note-bubble"><div class="anb-label">📋 Message from Administration</div>${report.adminNote}</div>`
+        : '';
+
+      const imagesHtml = (report.images||[]).length
+        ? `<div class="submitted-images">${report.images.map(img=>`<img src="${img.url||img.dataUrl}" alt="${img.name}" onclick="openLightbox('${img.url||img.dataUrl}')">`).join('')}</div>`
+        : '';
+
+      out.innerHTML = `
+        <div class="report-card">
+          <div class="report-card-header">
+            <div><div class="rc-id">${report.id}</div><div class="rc-type">${report.type}</div></div>
+            <div class="status-badge ${badgeClass}">${badgeLabel}</div>
+          </div>
+          <div class="progress-steps">${stepsHTML}</div>
+          <div class="divider"></div>
+          <div class="report-card-body">
+            <div style="margin-bottom:0.5rem;"><strong>Accused:</strong> ${report.accused}</div>
+            <strong>Description:</strong><br>${report.description}
+          </div>
+          ${imagesHtml}
+          <div class="report-card-footer">
+            <div>📍 ${report.location} &nbsp;·&nbsp; 📅 ${report.date}</div>
+            <div>Submitted anonymously · ${report.submitted}</div>
+          </div>
+          ${noteHtml}
+        </div>
+        ${statusNote}`;
+
+    } catch (err) {
+      out.innerHTML = `<div class="empty-state"><div class="emo">⚠️</div><p>Could not fetch report. Please check your connection.<br><small>${err.message}</small></p></div>`;
+    }
+  }
+
+  document.getElementById('search-id').addEventListener('keydown', e => { if(e.key==='Enter') lookupReport(); });
+
+  // ── Admin login ──
+  function tryLogin() {
+    const pw = document.getElementById('admin-password').value;
+    if (pw === ADMIN_PASS) {
+      sessionStorage.setItem('adminLoggedIn', 'yes');
+      document.getElementById('admin-error').style.display = 'none';
+      document.getElementById('admin-password').value = '';
+      document.getElementById('admin-gate').classList.remove('active');
+      document.getElementById('admin-panel').classList.add('active');
+      renderAdminPanel();
+    } else {
+      document.getElementById('admin-error').style.display = 'block';
+    }
+  }
+
+  function adminLogout() {
+    sessionStorage.removeItem('adminLoggedIn');
+    document.getElementById('admin-panel').classList.remove('active');
+    document.getElementById('submit').classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach((t,i) => { if(i===0) t.classList.add('active'); else t.classList.remove('active'); });
+  }
+
+  // ── Admin panel ──
+  async function renderAdminPanel() {
+    const list = document.getElementById('admin-reports-list');
+    list.innerHTML = '<div class="loading-reports"><div class="spinner"></div> Loading reports from GitLab…</div>';
+
+    try {
+      const reports = await glRead();
+      const keys = Object.keys(reports).reverse();
+
+      if (!keys.length) {
+        list.innerHTML = '<div class="empty-state"><div class="emo">📭</div><p>No reports have been submitted yet.</p></div>';
+        return;
+      }
+
+      list.innerHTML = keys.map(id => {
+        const r = reports[id];
+        const badgeClass = {pending:'status-pending',reviewing:'status-reviewing',resolved:'status-resolved',dismissed:'status-dismissed'}[r.status]||'status-pending';
+        const badgeLabel = {pending:'Pending',reviewing:'Under Review',resolved:'Resolved',dismissed:'Dismissed'}[r.status]||'Pending';
+        const imagesHtml = (r.images||[]).length
+          ? `<div class="arc-images">${r.images.map(img=>`<img src="${img.url||img.dataUrl}" alt="${img.name}" onclick="openLightbox('${img.url||img.dataUrl}')">`).join('')}</div>`
+          : '';
+
+        return `
+          <div class="admin-report-card">
+            <div class="arc-header">
+              <div class="arc-meta">
+                <div class="arc-id">${r.id} · ${r.submitted}</div>
+                <div class="arc-type">${r.type}</div>
+              </div>
+              <div class="status-badge ${badgeClass}">${badgeLabel}</div>
+            </div>
+            <div class="arc-body">
+              <strong>Accused:</strong> ${r.accused}<br>
+              <strong>Location:</strong> ${r.location}<br>
+              <strong>Date/Time:</strong> ${r.date}<br><br>
+              ${r.description}
+            </div>
+            ${imagesHtml}
+            <div class="arc-controls">
+              <select id="sel-${r.id}">
+                <option value="pending"   ${r.status==='pending'  ?'selected':''}>⏳ Pending</option>
+                <option value="reviewing" ${r.status==='reviewing'?'selected':''}>🔎 Under Review</option>
+                <option value="resolved"  ${r.status==='resolved' ?'selected':''}>✅ Resolved</option>
+                <option value="dismissed" ${r.status==='dismissed'?'selected':''}>🚫 Dismissed</option>
+              </select>
+              <textarea id="note-${r.id}" placeholder="Leave a note for the reporter (optional)…">${r.adminNote||''}</textarea>
+              <div>
+                <button class="arc-save-btn" onclick="saveStatus('${r.id}')">
+                  <span id="savelabel-${r.id}">Save</span>
+                </button>
+                <div class="arc-saved" id="saved-${r.id}">✓ Saved to GitLab</div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+    } catch (err) {
+      list.innerHTML = `<div class="empty-state"><div class="emo">⚠️</div><p>Could not load reports from GitLab.<br><small>${err.message}</small></p></div>`;
+    }
+  }
+
+  async function saveStatus(id) {
+    const saveLabel = document.getElementById(`savelabel-${id}`);
+    const savedEl   = document.getElementById(`saved-${id}`);
+    saveLabel.innerHTML = '<div class="spinner"></div>';
+
+    try {
+      const reports = await glRead();
+      if (!reports[id]) throw new Error('Report not found.');
+      reports[id].status    = document.getElementById(`sel-${id}`).value;
+      reports[id].adminNote = document.getElementById(`note-${id}`).value.trim();
+      await glWrite(reports, `Admin update: ${id}`);
+
+      saveLabel.textContent = 'Save';
+      savedEl.style.display = 'block';
+      setTimeout(() => savedEl.style.display = 'none', 3000);
+      showToast('Status updated on GitLab!');
+    } catch (err) {
+      saveLabel.textContent = 'Save';
+      showToast('Save failed: ' + (err.message||'Check connection.'));
+    }
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+</script>
+</body>
+</html>
